@@ -19,15 +19,13 @@
 # TODO: How this code deals with NA samples?
 
 library(tidyverse)
-library(dplyr)
 
 
-
-setwd("/Users/Miiko/Documents/projects/ns-seq_method-dev/experiments_yeast-ns-seq/spikeIn/validation_qpcr/2019-05-28_qpcrValidation/2019-05-28_qpcrValidation_0528_qpcr")
+setwd("/Users/Miiko/Documents/projects/ns-seq_method-dev/experiments_yeast-ns-seq/spikeIn/validation_qpcr/2019-05-30_0523-0528_combined")
 input.file <- "clean-data.tsv"
-data <- read.table(input.file, header=T, colClasses=c("factor", "factor", "numeric"))
-data <- filter(data, Sample != "dil7")
-data <- filter(data, Sample != "dil8")
+data <- read.table(input.file, header=T, colClasses=c("factor", "numeric", "numeric"))
+#data <- filter(data, Sample != "dil7")
+#data <- filter(data, Sample != "dil8")
 data
 #data <- data %>% filter(grepl("ssDNA", Sample)) #filter only subset of data, either ssDNA series or dsDNA (change as appropriate)
 
@@ -37,17 +35,21 @@ primerPairs
 
 # create a dilSer, which is a vector of template concentrations in ng
 # create a log of dilSer
-startingAmount <- 1
+startingAmount <- max(data$Sample)
+startingAmount
 dilutionFactor <- 10
-numTechRep <- 1
+numTechRep <- 2 # allows two values; either 1 or 2
 numPoints <- length(unique(data$Sample))
 dilSer <- c()
 for(i in 1:numPoints){
   nextDil <- startingAmount/(dilutionFactor^(i-1))
+  if (numTechRep == 1) {
   dilSer <- c(dilSer, nextDil)
-  #    for (j in 1:numTechRep){
-  #      dilSer <- c(dilSer, nextDil)
-  #    }
+  } else {
+      for (j in 1:numTechRep){
+        dilSer <- c(dilSer, nextDil)
+      }
+    }
 }
 logNg <- log10(dilSer)
 logNg
@@ -85,10 +87,17 @@ for (primer in primerPairs){
 
   # plot dilution series and linear model
   dilSer
+  tick.labels <- c(startingAmount/1e7, startingAmount/1e6, startingAmount/1e5, startingAmount/1e4, startingAmount/1e3, startingAmount/100, startingAmount/10, startingAmount)
   plot <-
     ggplot(dataSubset, mapping = aes(dilSer, Ct)) +
+    labs(title = primer, x = "Copy number", y = "Cycle threshold, Cq") +
     geom_point() +
-    scale_x_log10() +
+    annotate("text", x = startingAmount/10, y = 30, label = paste("slope = ",round(slope,digits = 2))) +
+    annotate("text", x = startingAmount/10, y = 28, label = paste("efficiency = ",round(efficiency,digits = 2))) +
+    annotate("text", x = startingAmount/10, y = 26, label = paste("Rsqr = ",round(Rsqr,digits = 3))) +
+    ylim(0, 40) +
+    scale_x_log10(labels = tick.labels, breaks = tick.labels) +
+    annotation_logticks(sides = "b") +
     theme_classic(14) +
     stat_smooth(method = "lm", col = "red", size = 0.3)
   ggsave(filename = paste(primer,".tif", sep = ""),
